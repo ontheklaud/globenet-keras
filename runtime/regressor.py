@@ -81,6 +81,8 @@ def main():
     test_error_log_path = path.join(ckpt_dir, "error_test.log")
     test_error_writer = open(test_error_log_path, 'w')
 
+    tasks = tuple(["train", "valid", "test"])
+
     for epoch in range(FLAGS.epochs):
 
         # Perform training

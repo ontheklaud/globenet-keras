@@ -9,19 +9,31 @@ from env import FLAGS
 from toolkit.dirty import read_list, write_list, resolve_coord_in, resolve_coord_in_v2
 
 
-def load_scene_list(path_scene=None, prefix=None, postfix=None):
-    scenes = dict()
+def load_scene_list(path_src=None, prefix='', postfix='', exclusion_list=None):
+    paths = dict()
 
-    for root, dirs, files in walk(path_scene, topdown=False):
+    for root, dirs, files in walk(path_src, topdown=False):
         for name in files:
-            key = name.replace(prefix, '').replace(postfix, '')
-            scene_profile = path.join(root, name)
-            scenes.update({key: scene_profile})
 
-    scene_keys = list(scenes.keys())
-    scene_keys.sort()
+            # old school name split
+            # key = name.replace(prefix, '').replace(postfix, '')
+            nameonly, ext = path.splitext(name)
+            if postfix.lower() == ext.lower():
+                key = nameonly.replace(prefix, '')
 
-    return scene_keys, scenes
+                # check exclusion list
+                if exclusion_list is not None and key in exclusion_list:
+                    pass
+                else:
+                    path_profile = path.join(root, name)
+                    paths.update({key: path_profile})
+            else:
+                continue
+
+    keys = list(paths.keys())
+    keys.sort()
+
+    return keys, paths
 
 
 class Dataset_PRegv3(object):
@@ -125,7 +137,8 @@ class Dataset_PRegv3(object):
     # data-set loading
     def read_binary(self, dpath=None, norm_max=1024):
 
-        resolve = np.fromfile(file=dpath, dtype='u2').reshape(self._in_shape)
+        # resolve = np.fromfile(file=dpath, dtype='u2').reshape(self._in_shape)
+        resolve = np.fromfile(file=dpath, dtype=np.uint16).reshape(self._in_shape)
 
         if self._input_norm:
             larger_than = resolve > norm_max - 1
@@ -361,7 +374,7 @@ class Dataset_PRegv3(object):
 
         # load list of available sensory images
         self._scene_key_list, self._scene_resolve_list = \
-            load_scene_list(path_scene=self._scene_path, prefix='', postfix='.ndarray')
+            load_scene_list(path_src=self._scene_path, prefix='', postfix='.bin')
 
         # load track labels
         self.load_track_labels()

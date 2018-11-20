@@ -9,7 +9,7 @@ FLAGS = flags.FLAGS
 
 DATASET_ROOT = '/mnt/NAS_QNAP/Public_Cold/research/globenet/dataset/typhoon'
 flags.DEFINE_string('dataset_root', DATASET_ROOT, 'dataset root')
-flags.DEFINE_string('path_scene', join(FLAGS.dataset_root, 'ndarray_Typhoons'), 'path_scene')
+flags.DEFINE_string('path_scene', join(FLAGS.dataset_root, 'ndarray_Typhoons_resize'), 'path_scene')
 flags.DEFINE_string('path_track', join(FLAGS.dataset_root, 'track_Typhoons.txt'), 'path_track')
 flags.DEFINE_string('path_track_exception', join(FLAGS.dataset_root, 'track_Typhoons_NX.txt'), 'path_track_exception')
 flags.DEFINE_string('summaries_dir', './summary', 'summaries directory')
@@ -46,8 +46,10 @@ SESS_CFG = tf_sess_config
 
 SECT_SIZE = 21
 
-Y_MAX = 1544
-X_MAX = 1934
+# Y_MAX = 1544
+# X_MAX = 1934
+Y_MAX = 768
+X_MAX = 768
 
 IN_SHAPE = (Y_MAX, X_MAX, 4)
 PH_IN_SHAPE = (None, Y_MAX, X_MAX, 4)
