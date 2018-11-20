@@ -32,6 +32,18 @@ def main():
                               img_shape=IN_SHAPE, postfix=".bin", rescale_img_max=1023, rescale_track=rescale_track,
                               list_exclusion=None)
 
+    iter_train = dataset2.it_train
+    sess.run(iter_train.initializer)
+    next_elem_train = iter_train.get_next()
+
+    while True:
+
+        out = sess.run(next_elem_train)
+        print(out)
+
+    exit()
+
+
     dataset = Dataset(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
                       path_track_exception=FLAGS.path_track_exception,
                       path_fold=fold_dir, preset_fold=FLAGS.preset_fold, use_valid=FLAGS.use_valid,

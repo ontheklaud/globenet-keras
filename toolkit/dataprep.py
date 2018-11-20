@@ -48,11 +48,18 @@ class Dataset_SatReg(object):
     rescale_img_max = None
     rescale_track = None
     list_exclusion = None
+    batch_size = None
 
     dict_track = None
 
+    # dataset_train = None
+    # dataset_test = None
+
+    it_train = None
+    it_test = None
+
     def __init__(self, path_scene=None, path_track=None, img_shape=None, prefix='', postfix='',
-                 rescale_img_max=1, rescale_track=None, list_exclusion=None):
+                 rescale_img_max=1, rescale_track=None, list_exclusion=None, batch_size=1):
 
         self.path_scene = path_scene
         self.path_track = path_track
@@ -63,6 +70,7 @@ class Dataset_SatReg(object):
         self.rescale_img_max = rescale_img_max
         self.rescale_track = rescale_track
         self.list_exclusion = list_exclusion if list_exclusion is not None else list()
+        self.batch_size = batch_size
 
         # set-up
 
@@ -85,18 +93,46 @@ class Dataset_SatReg(object):
         list_train_key = [keys[idx] for idx in train_idx]
         list_test_key = [keys[idx] for idx in test_idx]
 
-        dict_train_kv = dict()
-        dict_test_kv = dict()
-        for key in list_train_key:
-            dict_train_kv.update({key: tuple([paths[key], self.dict_track[key]])})
-        for key in list_test_key:
-            dict_test_kv.update({key: tuple([paths[key], self.dict_track[key]])})
+        # dict_train_kv = dict()
+        # dict_test_kv = dict()
+        # for key in list_train_key:
+        #     dict_train_kv.update({
+        #         key: dict({"key": paths[key], "track": self.dict_track[key]})
+        #     })
 
-        dataset_train = tf.data.Dataset.from_tensor_slices((list(dict_train_kv.keys()), list(dict_train_kv.values())))
-        # dataset_test = tf.data.Dataset.from_tensor_slices(list(list(dict_test_kv.values())))
+        # for key in list_test_key:
+        #     dict_test_kv.update({key: tuple([paths[key], self.dict_track[key]])})
 
-        # dataset_train = dataset_train.map()
-        # dataset_test = dataset_test.map()
+        dataset_train = tf.data.Dataset.from_tensor_slices((
+            # list_train_key,
+            [paths[key] for key in list_train_key],
+            [self.dict_track[key] for key in list_train_key]
+        ))
+
+        dataset_test = tf.data.Dataset.from_tensor_slices((
+            # list_test_key,
+            [paths[key] for key in list_test_key],
+            [self.dict_track[key] for key in list_test_key]
+        ))
+
+        dataset_train = dataset_train.map(
+            lambda path, track: tuple(tf.py_func(
+                self._read_func,
+                [path, track, self.img_shape, self.rescale_img_max],
+                [tf.float32, tf.float32, tf.float32]
+            ))
+        ).shuffle(buffer_size=self.batch_size*50).batch(batch_size=self.batch_size)
+
+        dataset_test = dataset_test.map(
+            lambda path, track: tuple(tf.py_func(
+                self._read_func,
+                [path, track, self.img_shape, self.rescale_img_max],
+                [tf.float32, tf.float32, tf.float32]
+            ))
+        ).batch(batch_size=self.batch_size).prefetch(buffer_size=self.batch_size*50)
+
+        self.it_train = dataset_train.make_initializable_iterator()
+        self.it_test = dataset_test.make_initializable_iterator()
 
         print("KFold:", len(train_idx), len(test_idx))
 
@@ -111,10 +147,12 @@ class Dataset_SatReg(object):
 
         scene = np.true_divide(
             np.fromfile(path, dtype=np.uint16).reshape(img_shape),
-            rescale_img_max)
+            rescale_img_max).astype(np.float32)
+
+        lat, long = track
 
         # fin
-        return scene, track
+        return scene, lat, long
 
     def read_tracks(self):
 
