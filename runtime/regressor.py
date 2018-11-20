@@ -7,6 +7,7 @@ from model.imglinreg import ImgLinReg
 from model.imglinregcplx import ImgLinRegCplx
 from env import FLAGS, IN_SHAPE, PH_IN_SHAPE, PH_OUT_INDEX, SESS_CFG
 from toolkit.dirty import np_mean, resolve_coord_out, latlong_distance
+from toolkit.dataprep import Dataset_SatReg
 from toolkit.dataprep import Dataset_PRegv3 as Dataset
 
 
@@ -25,6 +26,11 @@ def main():
 
     min_list = [2, -12, 50, 850]
     max_list = [9, 68, 206, 1040]
+    rescale_track = [-12, 68, 50, 206]
+
+    dataset2 = Dataset_SatReg(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
+                              img_shape=IN_SHAPE, postfix=".bin", rescale_img_max=1023, rescale_track=rescale_track,
+                              list_exclusion=None)
 
     dataset = Dataset(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
                       path_track_exception=FLAGS.path_track_exception,
@@ -81,9 +87,24 @@ def main():
     test_error_log_path = path.join(ckpt_dir, "error_test.log")
     test_error_writer = open(test_error_log_path, 'w')
 
-    tasks = tuple(["train", "valid", "test"])
+    # tasks = tuple(["train", "valid", "test"])
+    # dict_tasks_error = dict()
+    # dict_tasks_log_writer = dict()
+    # for task in tasks:
+    #     dict_tasks_error.update({task: list()})
+    #
+    #     task_error_log_path = path.join(ckpt_dir, "error_{:s}.log".format(task))
+    #     task_error_log_writer = open(task_error_log_path, mode="w")
+    #     dict_tasks_log_writer.update({task: task_error_log_writer})
 
     for epoch in range(FLAGS.epochs):
+
+        # for task in tasks:
+        #     print("[{:.1f}|epoch {:04d}] {:s}".format(time.time(), epoch + 1, task.upper()))
+        #
+        #     # cleanup task error list
+        #     dict_tasks_error[task].clear()
+
 
         # Perform training
         time_begin = time.time()
@@ -96,6 +117,8 @@ def main():
         for it in range(iters_train):
             scenes, tracks = dataset.get_next_batch(
                 mode='train', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
+
+            print("TRACK:", tracks)
 
             input_feed = {X: scenes, Y: tracks}
             output = sess.run(network.train(), feed_dict=input_feed)
@@ -149,6 +172,8 @@ def main():
         for it in range(iters_test):
             scenes, tracks = dataset.get_next_batch(
                 mode='test', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
+
+            print("Tracks:", tracks)
 
             input_feed = {X: scenes, Y: tracks}
             output = sess.run(network.valid(), feed_dict=input_feed)
