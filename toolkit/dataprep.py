@@ -47,9 +47,6 @@ class Dataset_SatReg(object):
 
     dict_track = None
 
-    # dataset_train = None
-    # dataset_test = None
-
     it_train = None
     it_test = None
 
@@ -88,24 +85,12 @@ class Dataset_SatReg(object):
         list_train_key = [keys[idx] for idx in train_idx]
         list_test_key = [keys[idx] for idx in test_idx]
 
-        # dict_train_kv = dict()
-        # dict_test_kv = dict()
-        # for key in list_train_key:
-        #     dict_train_kv.update({
-        #         key: dict({"key": paths[key], "track": self.dict_track[key]})
-        #     })
-
-        # for key in list_test_key:
-        #     dict_test_kv.update({key: tuple([paths[key], self.dict_track[key]])})
-
         dataset_train = tf.data.Dataset.from_tensor_slices((
-            # list_train_key,
             [paths[key] for key in list_train_key],
             [self.dict_track[key] for key in list_train_key]
         ))
 
         dataset_test = tf.data.Dataset.from_tensor_slices((
-            # list_test_key,
             [paths[key] for key in list_test_key],
             [self.dict_track[key] for key in list_test_key]
         ))
@@ -171,9 +156,8 @@ class Dataset_SatReg(object):
             value[0] = np.true_divide(value[0] - lat_min, lat_bound)
             value[1] = np.true_divide(value[1] - long_min, long_bound)
 
-            print("LINE:", key, value)
+            # print("LINE:", key, value)
             dict_track.update({key: value})
-
 
         # clean-up
         f_handle.close()
