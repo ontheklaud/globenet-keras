@@ -25,21 +25,11 @@ def main():
     else:
         pass
 
-    min_list = [2, -12, 50, 850]
-    max_list = [9, 68, 206, 1040]
     rescale_track = [-12, 68, 50, 206]
 
-    dataset2 = Dataset_SatReg(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
-                              img_shape=IN_SHAPE, postfix=".bin", rescale_img_max=1023, rescale_track=rescale_track,
-                              list_exclusion=None)
-
-
-
-    # dataset = Dataset(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
-    #                   path_track_exception=FLAGS.path_track_exception,
-    #                   path_fold=fold_dir, preset_fold=FLAGS.preset_fold, use_valid=FLAGS.use_valid,
-    #                   in_shape=IN_SHAPE, batch_size=FLAGS.batch_size, concurrent=1, output_size=1,
-    #                   norm_policy='minmax', min_list=min_list, max_list=max_list, input_norm=True, input_norm_scale=10)
+    dataset = Dataset_SatReg(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
+                             img_shape=IN_SHAPE, postfix=".bin", rescale_img_max=1023, rescale_track=rescale_track,
+                             list_exclusion=None)
 
     X = tf.placeholder(dtype=tf.float32, shape=PH_IN_SHAPE)
     Y = tf.placeholder(dtype=tf.float32, shape=PH_OUT_INDEX)
@@ -91,40 +81,9 @@ def main():
     test_error_writer = open(test_error_log_path, 'w')
 
     tasks = tuple(["train", "test"])
-    # tasks = tuple(["test"])
-    # dict_tasks_error = dict()
-    # dict_tasks_log_writer = dict()
-    # for task in tasks:
-    #     dict_tasks_error.update({task: list()})
-    #
-    #     task_error_log_path = path.join(ckpt_dir, "error_{:s}.log".format(task))
-    #     task_error_log_writer = open(task_error_log_path, mode="w")
-    #     dict_tasks_log_writer.update({task: task_error_log_writer})
 
-    #
-
-    # iter_train = dataset2.it_train
-    # sess.run(iter_train.initializer)
-    # next_elem_train = iter_train.get_next()
-
-    # idx = 0
-    # while True:
-    #     try:
-    #         feed_img, lat, long = sess.run(next_elem_train)
-    #         feed_track = np.hstack([lat, long])
-    #         # print(idx + 1, img.shape, track.shape, lat, long, track)
-    #         idx += 1
-    #     except tf.errors.OutOfRangeError:
-    #         break
-    #
     it_global = 0
     for epoch in range(FLAGS.epochs):
-
-        # for task in tasks:
-        #     print("[{:.1f}|epoch {:04d}] {:s}".format(time.time(), epoch + 1, task.upper()))
-        #
-        #     # cleanup task error list
-        #     dict_tasks_error[task].clear()
 
         # Perform training
         time_begin = time.time()
@@ -134,10 +93,10 @@ def main():
 
             if task == "train":
                 net_step = network.train()
-                data_task = dataset2.it_train
+                data_task = dataset.it_train
             elif task == "valid" or task == "test":
                 net_step = network.valid()
-                data_task = dataset2.it_test
+                data_task = dataset.it_test
             else:
                 net_step = None
                 data_task = None
@@ -171,7 +130,7 @@ def main():
                     it += 1
 
                     if it_global % FLAGS.summary_step == 0:
-                        tb_writer.add_summary(output[-1], step_inception)
+                        tb_writer.add_summary(output[-1], it_global)
                     else:
                         pass
                     it_global += 1
@@ -183,85 +142,95 @@ def main():
             print("[{:.1f}|epoch {:04d}] {:s} elapsed time: {:.1f} s".format(
                 time_it_end, epoch + 1, task.upper(), time_it_end-time_it_start))
 
-        continue
-        print("[{:.1f}|epoch {:04d}] TRAIN".format(time.time(), epoch + 1, ))
-
-        # training
-        train_errors = list()
-        iters_train = dataset.get_iter_size(mode='train')
-        for it in range(iters_train):
-            scenes, tracks = dataset.get_next_batch(
-                mode='train', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
-
-            print("TRACK:", tracks)
-
-            input_feed = {X: scenes, Y: tracks}
-            output = sess.run(network.train(), feed_dict=input_feed)
-
-            step_inception = (epoch * iters_train) + it
-            if step_inception > 0 and step_inception % FLAGS.summary_step == 0:
-                tb_writer.add_summary(output[-1], step_inception)
+            if task == "valid":
+                valid_error_writer.write("{:f},{:f}\n".format(np.mean(task_errors), np.std(task_errors)))
+                valid_error_writer.flush()
+            elif task == "test":
+                test_error_writer.write("{:f},{:f}\n".format(np.mean(task_errors), np.std(task_errors)))
+                test_error_writer.flush()
             else:
                 pass
 
-            print("[{:.1f}|epoch {:04d}|iter {:04d}]: RMSE {:.3f}".format(time.time(), epoch + 1, it + 1, output[1]))
-
-            # append batch train errors to list
-            train_errors.append(output[1])
-
-        time_end = time.time()
-        # reduce & mean train errors
-        train_error_mean = np_mean(train_errors)
-        print("[{:.1f}|epoch {:04d}] train error: {:.3f}".format(time_end, epoch + 1, train_error_mean))
-
-        training_time = time_end - time_begin
-        print("[{:.1f}|epoch {:04d}] Training elapsed time: {:.1f} s".format(time.time(), epoch+1, training_time))
-
-        print("[epoch {0:04d}] VALID".format(epoch + 1))
-
-        # validation
-        valid_errors = list()
-        iters_valid = dataset.get_iter_size(mode='valid')
-        for it in range(iters_valid):
-            scenes, tracks = dataset.get_next_batch(
-                mode='valid', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
-
-            input_feed = {X: scenes, Y: tracks}
-            output = sess.run(network.valid(), feed_dict=input_feed)
-
-            # append batch valid errors to list
-            valid_errors.append(output)
-
-        # reduce & mean valid errors
-        valid_error_mean = np_mean(valid_errors)
-
-        print("[epoch %04d] valid error: %.3f" % (epoch + 1, valid_error_mean))
-        valid_error_writer.write("%.3f\n" % valid_error_mean)
-        valid_error_writer.flush()
-
-        print("[epoch {0:04d}] TEST".format(epoch + 1))
-
-        # test
-        test_errors = list()
-        iters_test = dataset.get_iter_size(mode='test')
-        for it in range(iters_test):
-            scenes, tracks = dataset.get_next_batch(
-                mode='test', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
-
-            print("Tracks:", tracks)
-
-            input_feed = {X: scenes, Y: tracks}
-            output = sess.run(network.valid(), feed_dict=input_feed)
-
-            # append batch test errors to list
-            test_errors.append(output)
-
-        # reduce & mean test errors
-        test_error_mean = np_mean(test_errors)
-
-        print("[epoch %04d] test error: %.3f" % (epoch + 1, test_error_mean))
-        test_error_writer.write("%.3f\n" % test_error_mean)
-        test_error_writer.flush()
+        #
+        # continue
+        # print("[{:.1f}|epoch {:04d}] TRAIN".format(time.time(), epoch + 1, ))
+        #
+        # # training
+        # train_errors = list()
+        # iters_train = dataset.get_iter_size(mode='train')
+        # for it in range(iters_train):
+        #     scenes, tracks = dataset.get_next_batch(
+        #         mode='train', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
+        #
+        #     print("TRACK:", tracks)
+        #
+        #     input_feed = {X: scenes, Y: tracks}
+        #     output = sess.run(network.train(), feed_dict=input_feed)
+        #
+        #     step_inception = (epoch * iters_train) + it
+        #     if step_inception > 0 and step_inception % FLAGS.summary_step == 0:
+        #         tb_writer.add_summary(output[-1], step_inception)
+        #     else:
+        #         pass
+        #
+        #     print("[{:.1f}|epoch {:04d}|iter {:04d}]: RMSE {:.3f}".format(time.time(), epoch + 1, it + 1, output[1]))
+        #
+        #     # append batch train errors to list
+        #     train_errors.append(output[1])
+        #
+        # time_end = time.time()
+        # # reduce & mean train errors
+        # train_error_mean = np_mean(train_errors)
+        # print("[{:.1f}|epoch {:04d}] train error: {:.3f}".format(time_end, epoch + 1, train_error_mean))
+        #
+        # training_time = time_end - time_begin
+        # print("[{:.1f}|epoch {:04d}] Training elapsed time: {:.1f} s".format(time.time(), epoch+1, training_time))
+        #
+        # print("[epoch {0:04d}] VALID".format(epoch + 1))
+        #
+        # # validation
+        # valid_errors = list()
+        # iters_valid = dataset.get_iter_size(mode='valid')
+        # for it in range(iters_valid):
+        #     scenes, tracks = dataset.get_next_batch(
+        #         mode='valid', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
+        #
+        #     input_feed = {X: scenes, Y: tracks}
+        #     output = sess.run(network.valid(), feed_dict=input_feed)
+        #
+        #     # append batch valid errors to list
+        #     valid_errors.append(output)
+        #
+        # # reduce & mean valid errors
+        # valid_error_mean = np_mean(valid_errors)
+        #
+        # print("[epoch %04d] valid error: %.3f" % (epoch + 1, valid_error_mean))
+        # valid_error_writer.write("%.3f\n" % valid_error_mean)
+        # valid_error_writer.flush()
+        #
+        # print("[epoch {0:04d}] TEST".format(epoch + 1))
+        #
+        # # test
+        # test_errors = list()
+        # iters_test = dataset.get_iter_size(mode='test')
+        # for it in range(iters_test):
+        #     scenes, tracks = dataset.get_next_batch(
+        #         mode='test', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
+        #
+        #     print("Tracks:", tracks)
+        #
+        #     input_feed = {X: scenes, Y: tracks}
+        #     output = sess.run(network.valid(), feed_dict=input_feed)
+        #
+        #     # append batch test errors to list
+        #     test_errors.append(output)
+        #
+        # # reduce & mean test errors
+        # test_error_mean = np_mean(test_errors)
+        #
+        # print("[epoch %04d] test error: %.3f" % (epoch + 1, test_error_mean))
+        # test_error_writer.write("%.3f\n" % test_error_mean)
+        # test_error_writer.flush()
 
         # save model per 1 epoch
         saved_path = saver.save(sess, save_path, global_step=epoch + latest_ckpt_step)
