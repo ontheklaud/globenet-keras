@@ -1,6 +1,7 @@
 from os import path, makedirs
 import time
 
+import numpy as np
 import tensorflow as tf
 
 from model.imglinreg import ImgLinReg
@@ -32,23 +33,13 @@ def main():
                               img_shape=IN_SHAPE, postfix=".bin", rescale_img_max=1023, rescale_track=rescale_track,
                               list_exclusion=None)
 
-    iter_train = dataset2.it_train
-    sess.run(iter_train.initializer)
-    next_elem_train = iter_train.get_next()
-
-    while True:
-
-        out = sess.run(next_elem_train)
-        print(out)
-
-    exit()
 
 
-    dataset = Dataset(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
-                      path_track_exception=FLAGS.path_track_exception,
-                      path_fold=fold_dir, preset_fold=FLAGS.preset_fold, use_valid=FLAGS.use_valid,
-                      in_shape=IN_SHAPE, batch_size=FLAGS.batch_size, concurrent=1, output_size=1,
-                      norm_policy='minmax', min_list=min_list, max_list=max_list, input_norm=True, input_norm_scale=10)
+    # dataset = Dataset(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
+    #                   path_track_exception=FLAGS.path_track_exception,
+    #                   path_fold=fold_dir, preset_fold=FLAGS.preset_fold, use_valid=FLAGS.use_valid,
+    #                   in_shape=IN_SHAPE, batch_size=FLAGS.batch_size, concurrent=1, output_size=1,
+    #                   norm_policy='minmax', min_list=min_list, max_list=max_list, input_norm=True, input_norm_scale=10)
 
     X = tf.placeholder(dtype=tf.float32, shape=PH_IN_SHAPE)
     Y = tf.placeholder(dtype=tf.float32, shape=PH_OUT_INDEX)
@@ -99,7 +90,8 @@ def main():
     test_error_log_path = path.join(ckpt_dir, "error_test.log")
     test_error_writer = open(test_error_log_path, 'w')
 
-    # tasks = tuple(["train", "valid", "test"])
+    tasks = tuple(["train", "test"])
+    # tasks = tuple(["test"])
     # dict_tasks_error = dict()
     # dict_tasks_log_writer = dict()
     # for task in tasks:
@@ -109,6 +101,23 @@ def main():
     #     task_error_log_writer = open(task_error_log_path, mode="w")
     #     dict_tasks_log_writer.update({task: task_error_log_writer})
 
+    #
+
+    # iter_train = dataset2.it_train
+    # sess.run(iter_train.initializer)
+    # next_elem_train = iter_train.get_next()
+
+    # idx = 0
+    # while True:
+    #     try:
+    #         feed_img, lat, long = sess.run(next_elem_train)
+    #         feed_track = np.hstack([lat, long])
+    #         # print(idx + 1, img.shape, track.shape, lat, long, track)
+    #         idx += 1
+    #     except tf.errors.OutOfRangeError:
+    #         break
+    #
+    it_global = 0
     for epoch in range(FLAGS.epochs):
 
         # for task in tasks:
@@ -117,10 +126,64 @@ def main():
         #     # cleanup task error list
         #     dict_tasks_error[task].clear()
 
-
         # Perform training
         time_begin = time.time()
         print("[{:.1f}|epoch {:04d}] INIT".format(time_begin, epoch + 1))
+
+        for task in tasks:
+
+            if task == "train":
+                net_step = network.train()
+                data_task = dataset2.it_train
+            elif task == "valid" or task == "test":
+                net_step = network.valid()
+                data_task = dataset2.it_test
+            else:
+                net_step = None
+                data_task = None
+
+            # iter_task = dataset2.it_train
+            sess.run(data_task.initializer)
+            next_elem_feed = data_task.get_next()
+
+            it = 0
+            time_it_start = time.time()
+            print("[{:.1f}|epoch {:04d}] {:s}".format(time_it_start, epoch + 1, task.upper()))
+            task_errors = list()
+            while True:
+                try:
+                    feed_scene, lat, long = sess.run(next_elem_feed)
+                    feed_track = np.hstack([lat[np.newaxis, :], long[np.newaxis, :]])[np.newaxis, :]
+                    # print('feed_track:', feed_track.shape)
+
+                    feed_dict = dict({X: feed_scene, Y: feed_track})
+                    output = sess.run(net_step, feed_dict=feed_dict)
+                    loss = output[1] if task == "train" else output
+
+                    if task == "train":
+                        print("[{:.1f}|epoch {:04d}|iter {:04d}]: RMSE {:.3f}".format(
+                            time.time(), epoch + 1, it + 1, loss))
+                    else:
+                        pass
+
+                    task_errors.append(loss)
+
+                    it += 1
+
+                    if it_global % FLAGS.summary_step == 0:
+                        tb_writer.add_summary(output[-1], step_inception)
+                    else:
+                        pass
+                    it_global += 1
+                except tf.errors.OutOfRangeError:
+                    break
+            time_it_end = time.time()
+            print("[{:.1f}|epoch {:04d}] {:s} mean error: RMSE {:.3f}, StdDev: {:.3f}".format(
+                time_it_end, epoch + 1, task.upper(), np.mean(task_errors), np.std(task_errors)))
+            print("[{:.1f}|epoch {:04d}] {:s} elapsed time: {:.1f} s".format(
+                time_it_end, epoch + 1, task.upper(), time_it_end-time_it_start))
+
+        continue
         print("[{:.1f}|epoch {:04d}] TRAIN".format(time.time(), epoch + 1, ))
 
         # training
