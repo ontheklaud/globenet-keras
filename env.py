@@ -4,14 +4,16 @@ import tensorflow as tf
 from tensorflow.python.client import device_lib
 
 # set FLAGS for tensorflow app flags
-flags = tf.app.flags
-FLAGS = flags.FLAGS
+# flags = tf.app.flags
+# FLAGS = flags.FLAGS
+flags = tf.flags
+FLAGS = tf.flags.FLAGS
 
 DATASET_ROOT = '/mnt/NAS_QNAP/Public_Cold/research/globenet/dataset/typhoon'
 flags.DEFINE_string('dataset_root', DATASET_ROOT, 'dataset root')
-flags.DEFINE_string('path_scene', join(FLAGS.dataset_root, 'ndarray_Typhoons_resize'), 'path_scene')
-flags.DEFINE_string('path_track', join(FLAGS.dataset_root, 'track_Typhoons.txt'), 'path_track')
-flags.DEFINE_string('path_track_exception', join(FLAGS.dataset_root, 'track_Typhoons_NX.txt'), 'path_track_exception')
+flags.DEFINE_string('path_scene', join(DATASET_ROOT, 'ndarray_Typhoons_resize'), 'path_scene')
+flags.DEFINE_string('path_track', join(DATASET_ROOT, 'track_Typhoons.txt'), 'path_track')
+flags.DEFINE_string('path_track_exception', join(DATASET_ROOT, 'track_Typhoons_NX.txt'), 'path_track_exception')
 flags.DEFINE_string('summaries_dir', './summary', 'summaries directory')
 flags.DEFINE_string('ckpt_dir', './ckpt', 'checkpoint directory')
 flags.DEFINE_integer('output_length', 1, 'output_length')

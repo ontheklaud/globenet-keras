@@ -7,12 +7,10 @@ import tensorflow as tf
 from model.imglinreg import ImgLinReg
 from model.imglinregcplx import ImgLinRegCplx
 from env import FLAGS, IN_SHAPE, PH_IN_SHAPE, PH_OUT_INDEX, SESS_CFG
-from toolkit.dirty import np_mean, resolve_coord_out, latlong_distance
 from toolkit.dataprep import Dataset_SatReg
-from toolkit.dataprep import Dataset_PRegv3 as Dataset
 
 
-def main():
+def main(argv):
 
     sess = tf.Session(config=SESS_CFG)
 
@@ -26,10 +24,9 @@ def main():
         pass
 
     rescale_track = [-12, 68, 50, 206]
-
     dataset = Dataset_SatReg(path_scene=FLAGS.path_scene, path_track=FLAGS.path_track,
                              img_shape=IN_SHAPE, postfix=".bin", rescale_img_max=1023, rescale_track=rescale_track,
-                             list_exclusion=None)
+                             list_exclusion=None, batch_size=FLAGS.batch_size)
 
     X = tf.placeholder(dtype=tf.float32, shape=PH_IN_SHAPE)
     Y = tf.placeholder(dtype=tf.float32, shape=PH_OUT_INDEX)
@@ -101,7 +98,6 @@ def main():
                 net_step = None
                 data_task = None
 
-            # iter_task = dataset2.it_train
             sess.run(data_task.initializer)
             next_elem_feed = data_task.get_next()
 
@@ -112,8 +108,8 @@ def main():
             while True:
                 try:
                     feed_scene, lat, long = sess.run(next_elem_feed)
-                    feed_track = np.hstack([lat[np.newaxis, :], long[np.newaxis, :]])[np.newaxis, :]
-                    # print('feed_track:', feed_track.shape)
+                    feed_track = np.hstack([lat[:, np.newaxis], long[:, np.newaxis]])
+                    feed_track = feed_track[:, np.newaxis, :]
 
                     feed_dict = dict({X: feed_scene, Y: feed_track})
                     output = sess.run(net_step, feed_dict=feed_dict)
@@ -128,12 +124,14 @@ def main():
                     task_errors.append(loss)
 
                     it += 1
-
-                    if it_global % FLAGS.summary_step == 0:
-                        tb_writer.add_summary(output[-1], it_global)
+                    if task == "train":
+                        if it_global % FLAGS.summary_step == 0:
+                            tb_writer.add_summary(output[-1], it_global)
+                        else:
+                            pass
+                        it_global += 1
                     else:
                         pass
-                    it_global += 1
                 except tf.errors.OutOfRangeError:
                     break
             time_it_end = time.time()
@@ -151,87 +149,6 @@ def main():
             else:
                 pass
 
-        #
-        # continue
-        # print("[{:.1f}|epoch {:04d}] TRAIN".format(time.time(), epoch + 1, ))
-        #
-        # # training
-        # train_errors = list()
-        # iters_train = dataset.get_iter_size(mode='train')
-        # for it in range(iters_train):
-        #     scenes, tracks = dataset.get_next_batch(
-        #         mode='train', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
-        #
-        #     print("TRACK:", tracks)
-        #
-        #     input_feed = {X: scenes, Y: tracks}
-        #     output = sess.run(network.train(), feed_dict=input_feed)
-        #
-        #     step_inception = (epoch * iters_train) + it
-        #     if step_inception > 0 and step_inception % FLAGS.summary_step == 0:
-        #         tb_writer.add_summary(output[-1], step_inception)
-        #     else:
-        #         pass
-        #
-        #     print("[{:.1f}|epoch {:04d}|iter {:04d}]: RMSE {:.3f}".format(time.time(), epoch + 1, it + 1, output[1]))
-        #
-        #     # append batch train errors to list
-        #     train_errors.append(output[1])
-        #
-        # time_end = time.time()
-        # # reduce & mean train errors
-        # train_error_mean = np_mean(train_errors)
-        # print("[{:.1f}|epoch {:04d}] train error: {:.3f}".format(time_end, epoch + 1, train_error_mean))
-        #
-        # training_time = time_end - time_begin
-        # print("[{:.1f}|epoch {:04d}] Training elapsed time: {:.1f} s".format(time.time(), epoch+1, training_time))
-        #
-        # print("[epoch {0:04d}] VALID".format(epoch + 1))
-        #
-        # # validation
-        # valid_errors = list()
-        # iters_valid = dataset.get_iter_size(mode='valid')
-        # for it in range(iters_valid):
-        #     scenes, tracks = dataset.get_next_batch(
-        #         mode='valid', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
-        #
-        #     input_feed = {X: scenes, Y: tracks}
-        #     output = sess.run(network.valid(), feed_dict=input_feed)
-        #
-        #     # append batch valid errors to list
-        #     valid_errors.append(output)
-        #
-        # # reduce & mean valid errors
-        # valid_error_mean = np_mean(valid_errors)
-        #
-        # print("[epoch %04d] valid error: %.3f" % (epoch + 1, valid_error_mean))
-        # valid_error_writer.write("%.3f\n" % valid_error_mean)
-        # valid_error_writer.flush()
-        #
-        # print("[epoch {0:04d}] TEST".format(epoch + 1))
-        #
-        # # test
-        # test_errors = list()
-        # iters_test = dataset.get_iter_size(mode='test')
-        # for it in range(iters_test):
-        #     scenes, tracks = dataset.get_next_batch(
-        #         mode='test', out_as_np=True, skip_conf=True, scrap=2, start_idx=1)
-        #
-        #     print("Tracks:", tracks)
-        #
-        #     input_feed = {X: scenes, Y: tracks}
-        #     output = sess.run(network.valid(), feed_dict=input_feed)
-        #
-        #     # append batch test errors to list
-        #     test_errors.append(output)
-        #
-        # # reduce & mean test errors
-        # test_error_mean = np_mean(test_errors)
-        #
-        # print("[epoch %04d] test error: %.3f" % (epoch + 1, test_error_mean))
-        # test_error_writer.write("%.3f\n" % test_error_mean)
-        # test_error_writer.flush()
-
         # save model per 1 epoch
         saved_path = saver.save(sess, save_path, global_step=epoch + latest_ckpt_step)
         print("Model %s-%d saved as %s" % (FLAGS.model_name, epoch + latest_ckpt_step, saved_path))
@@ -246,4 +163,4 @@ def main():
 
 if __name__ == '__main__':
     # execute
-    main()
+    tf.app.run()
