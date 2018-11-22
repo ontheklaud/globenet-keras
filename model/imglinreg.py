@@ -91,9 +91,7 @@ class ImgLinReg(object):
         net = ResolvedSyn(x=Dense(units=8192)(net), type=self._flat_act_policy)
         net = ResolvedSyn(x=Dense(units=1024)(net), type=self._flat_act_policy)
         net = Dense(units=128, activation=self._flat_act_policy)(net)
-        # net = Dense(units=2, activation='linear')(net)
         net = Dense(units=self._output_size, activation='sigmoid')(net)
-        # net = Reshape([1, self._output_size])(net)
         self._net = net
 
         rmse = root_mean_sqrt_error(labels=y, predictions=net)

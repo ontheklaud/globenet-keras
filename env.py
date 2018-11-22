@@ -1,15 +1,14 @@
+from os import getcwd
 from os.path import join
 
 import tensorflow as tf
 from tensorflow.python.client import device_lib
 
 # set FLAGS for tensorflow app flags
-# flags = tf.app.flags
-# FLAGS = flags.FLAGS
 flags = tf.flags
 FLAGS = tf.flags.FLAGS
 
-DATASET_ROOT = 'data/typhoon'
+DATASET_ROOT = join(getcwd(), "data")
 flags.DEFINE_string('dataset_root', DATASET_ROOT, 'dataset root')
 flags.DEFINE_string('path_scene', join(DATASET_ROOT, 'ndarray_Typhoons_resize'), 'path_scene')
 flags.DEFINE_string('path_track', join(DATASET_ROOT, 'track_Typhoons.txt'), 'path_track')
