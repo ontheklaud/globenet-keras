@@ -1,4 +1,15 @@
 # GlobeNet-Keras
+Neural Nets for understanding Weather Events from Satellite Observation
+
+## Input
+A complex images consisted of
+* stacked up with multiple vision channels
+* delivered from remote sensors
+
+### Candidates
+#### 4ch IR Image
+* source: COMS-1 MI (https://www.wmo-sat.info/oscar/instruments/view/283)
+* size (NHWC): (?, 1544, 1934, 4)  
 
 ## Execution (Windows 10 x64)
 * Run Anaconda Prompt
